@@ -4,15 +4,11 @@
 #include <sndcore2/device.h>
 #include <sndcore2/voice.h>
 #include <coreinit/cache.h>
-#include <coreinit/thread.h>
 #include <coreinit/time.h>
-#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <malloc.h>
-#include <string>
-#include <thread>
 #include <vector>
 
 #define MINIMP3_IMPLEMENTATION
@@ -21,90 +17,78 @@
 #define MINIMP3_NO_STDIO
 #include "eg2/libs/minimp3_ex.h"
 
-namespace Music {
-    enum State : int { Idle, Decoding, Ready, Playing, Failed };
+// Everything runs on the main thread: the song is decoded a few
+// milliseconds per frame, so the screen and the HOME button never wait for
+// it. (A separate decoding thread froze the app on the console.)
 
-    static std::atomic<int> gState{Idle};
-    static std::atomic<bool> gAbort{false};
-    static std::thread gThread;
+namespace Music {
+    enum State { Idle, Decoding, Done, Failed };
+
+    static State gState = Idle;
+    static std::vector<uint8_t> gFile;
+    static mp3dec_ex_t gDecoder;
 
     static int16_t* gChannel[2] = {nullptr, nullptr}; // one mono buffer per voice
     static int gChannels = 0;
-    static uint32_t gFrames = 0;
+    static uint32_t gFrames = 0;   // total samples per channel
+    static uint32_t gDecoded = 0;  // samples per channel decoded so far
     static int gRate = 0;
     static uint32_t gLoopStart = 0;
     static uint16_t gVolume = 0x8000;
     static bool gMuted = false;
+    static bool gPlaying = false;
     static AXVoice* gVoices[2] = {nullptr, nullptr};
 
-    // Called after every MP3 frame. Gives the CPU back regularly so the
-    // screen keeps running while the song is decoded.
-    static int Progress(void*, size_t, uint64_t, mp3dec_frame_info_t*) {
-        static uint32_t frames = 0;
-        if (++frames % 8 == 0) OSSleepTicks(OSMicrosecondsToTicks(500));
-        return gAbort.load() ? 1 : 0; // non-zero stops decoding
-    }
+    static constexpr uint32_t BUDGET_US = 3000;     // decoding time per frame
+    static constexpr uint32_t BOOST_US = 10000;     // when playback gets close
+    static constexpr uint32_t START_SECONDS = 4;    // decoded before playing
 
-    static void Decode(std::string path) {
-        // Lower priority than the main thread (higher number = lower priority)
-        OSSetThreadPriority(OSGetCurrentThread(), 28);
-
-        std::vector<uint8_t> file;
-        FILE* f = fopen(path.c_str(), "rb");
-        if (f) {
-            uint8_t buffer[16 * 1024];
-            size_t n;
-            while ((n = fread(buffer, 1, sizeof(buffer), f)) > 0) file.insert(file.end(), buffer, buffer + n);
-            fclose(f);
-        }
-        if (file.empty()) {
-            SYS::Report::Log("Music: can't read %s\n", path.c_str());
-            gState = Failed;
-            return;
-        }
-
-        static mp3dec_t dec;
-        mp3dec_file_info_t info;
-        memset(&info, 0, sizeof(info));
-        if (mp3dec_load_buf(&dec, file.data(), file.size(), &info, Progress, nullptr) != 0 || !info.buffer ||
-            info.samples == 0 || (info.channels != 1 && info.channels != 2) || gAbort) {
-            free(info.buffer);
-            SYS::Report::Log("Music: decoding failed\n");
-            gState = Failed;
-            return;
-        }
-
-        gChannels = info.channels;
-        gRate = info.hz;
-        gFrames = (uint32_t)(info.samples / info.channels);
-
-        // Samples are native endian, which on the Wii U is the big endian AX wants
-        bool ok = true;
-        for (int c = 0; c < gChannels; c++) {
-            gChannel[c] = (int16_t*)memalign(0x40, gFrames * sizeof(int16_t));
-            if (!gChannel[c]) { ok = false; break; }
-            for (uint32_t i = 0; i < gFrames; i++) gChannel[c][i] = info.buffer[i * gChannels + c];
-            DCFlushRange(gChannel[c], gFrames * sizeof(int16_t));
-        }
-        free(info.buffer);
-
-        if (!ok) {
-            for (auto& ch : gChannel) { free(ch); ch = nullptr; }
-            gState = Failed;
-            return;
-        }
-
-        if (gLoopStart >= gFrames) gLoopStart = 0;
-        SYS::Report::Log("Music: %u frames, %d ch, %d Hz\n", gFrames, gChannels, gRate);
-        gState = Ready;
+    static void FreeAll(void) {
+        for (auto& ch : gChannel) { free(ch); ch = nullptr; }
+        gFile.clear();
+        gFile.shrink_to_fit();
     }
 
     void Start(const char* path, uint32_t loopStart, float volume) {
         if (gState != Idle) return;
         gLoopStart = loopStart;
         gVolume = (uint16_t)(volume <= 0 ? 0 : volume >= 1 ? 0x8000 : volume * 0x8000);
+        gState = Failed;
+
+        FILE* f = fopen(path, "rb");
+        if (!f) {
+            SYS::Report::Log("Music: can't open %s\n", path);
+            return;
+        }
+        uint8_t buffer[16 * 1024];
+        size_t n;
+        while ((n = fread(buffer, 1, sizeof(buffer), f)) > 0) gFile.insert(gFile.end(), buffer, buffer + n);
+        fclose(f);
+
+        if (gFile.empty() || mp3dec_ex_open_buf(&gDecoder, gFile.data(), gFile.size(), MP3D_SEEK_TO_SAMPLE) != 0 ||
+            (gDecoder.info.channels != 1 && gDecoder.info.channels != 2) || gDecoder.samples == 0) {
+            SYS::Report::Log("Music: not a usable MP3\n");
+            FreeAll();
+            return;
+        }
+
+        gChannels = gDecoder.info.channels;
+        gRate = gDecoder.info.hz;
+        gFrames = (uint32_t)(gDecoder.samples / gChannels);
+        if (gLoopStart >= gFrames) gLoopStart = 0;
+
+        for (int c = 0; c < gChannels; c++) {
+            gChannel[c] = (int16_t*)memalign(0x40, gFrames * sizeof(int16_t));
+            if (!gChannel[c]) {
+                mp3dec_ex_close(&gDecoder);
+                FreeAll();
+                return;
+            }
+        }
+
+        gDecoded = 0;
         gState = Decoding;
-        gThread = std::thread(Decode, std::string(path));
+        SYS::Report::Log("Music: %u frames, %d ch, %d Hz\n", gFrames, gChannels, gRate);
     }
 
     static void ApplyVolume(void) {
@@ -163,11 +147,64 @@ namespace Music {
         for (AXVoice* v : gVoices) if (v) AXSetVoiceState(v, AX_VOICE_STATE_PLAYING);
         for (AXVoice* v : gVoices) if (v) AXVoiceEnd(v);
 
-        gState = Playing;
+        gPlaying = gVoices[0] != nullptr;
+    }
+
+    // Samples per channel the song has played so far (0 before it starts)
+    static uint32_t PlayPosition(void) {
+        if (!gPlaying || !gVoices[0]) return 0;
+        uint32_t pos = AXGetVoiceCurrentOffsetEx(gVoices[0], gChannel[0]);
+        return pos < gFrames ? pos : gFrames;
+    }
+
+    static void DecodeSome(void) {
+        // Normally a small slice per frame; more when playback gets close to
+        // the end of what's decoded (decoding is many times faster than real time)
+        uint32_t margin = (uint32_t)gRate * 2;
+        uint32_t budget = (gPlaying && PlayPosition() + margin > gDecoded) ? BOOST_US : BUDGET_US;
+
+        static mp3d_sample_t chunk[MINIMP3_MAX_SAMPLES_PER_FRAME * 4];
+        const uint32_t first = gDecoded;
+        const OSTime start = OSGetTime();
+
+        while (gDecoded < gFrames && OSTicksToMicroseconds(OSGetTime() - start) < budget) {
+            size_t got = mp3dec_ex_read(&gDecoder, chunk, sizeof(chunk) / sizeof(chunk[0]));
+            uint32_t frames = (uint32_t)(got / gChannels);
+            if (frames == 0) {
+                // End of the data (or an error): fill the rest with silence
+                for (int c = 0; c < gChannels; c++) memset(gChannel[c] + gDecoded, 0, (gFrames - gDecoded) * sizeof(int16_t));
+                gDecoded = gFrames;
+                break;
+            }
+            if (frames > gFrames - gDecoded) frames = gFrames - gDecoded;
+
+            // Samples are native endian, which on the Wii U is the big endian AX wants
+            for (int c = 0; c < gChannels; c++) {
+                int16_t* dst = gChannel[c] + gDecoded;
+                for (uint32_t i = 0; i < frames; i++) dst[i] = chunk[i * gChannels + c];
+            }
+            gDecoded += frames;
+        }
+
+        // Make the new samples visible to the audio hardware
+        for (int c = 0; c < gChannels; c++) DCFlushRange(gChannel[c] + first, (gDecoded - first) * sizeof(int16_t));
+
+        if (gDecoded >= gFrames) {
+            mp3dec_ex_close(&gDecoder);
+            gFile.clear();
+            gFile.shrink_to_fit();
+            gState = Done;
+            SYS::Report::Log("Music: decoded\n");
+        }
     }
 
     void Update(void) {
-        if (gState == Ready) Play();
+        if (gState != Decoding && !(gState == Done && !gPlaying)) return;
+
+        if (gState == Decoding) DecodeSome();
+
+        uint32_t needed = (uint32_t)gRate * START_SECONDS;
+        if (!gPlaying && (gDecoded >= needed || gState == Done)) Play();
     }
 
     void ToggleMute(void) {
@@ -176,12 +213,9 @@ namespace Music {
     }
 
     bool IsMuted(void) { return gMuted; }
-    bool IsAvailable(void) { return gState == Playing; }
+    bool IsAvailable(void) { return gPlaying; }
 
     void Shutdown(void) {
-        gAbort = true;
-        if (gThread.joinable()) gThread.join();
-
         for (AXVoice*& v : gVoices) {
             if (!v) continue;
             AXVoiceBegin(v);
@@ -190,7 +224,9 @@ namespace Music {
             AXFreeVoice(v);
             v = nullptr;
         }
-        for (auto& ch : gChannel) { free(ch); ch = nullptr; }
+        gPlaying = false;
+        if (gState == Decoding) mp3dec_ex_close(&gDecoder);
+        FreeAll();
         gState = Idle;
     }
 }

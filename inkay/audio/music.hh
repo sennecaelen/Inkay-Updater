@@ -3,12 +3,13 @@
 #include <cstdint>
 
 namespace Music {
-    // Decodes the MP3 in the background and starts looping it on the TV and
-    // GamePad when ready. loopStart is in samples: at the end the song jumps
-    // back there instead of to the beginning.
+    // Loads the MP3 and starts looping it on the TV and GamePad once the first
+    // seconds are decoded (the rest is decoded a little every frame in
+    // Update). loopStart is in samples: at the end the song jumps back there
+    // instead of to the beginning.
     void Start(const char* path, uint32_t loopStart, float volume);
 
-    void Update(void); // call every frame (AX calls stay on the main thread)
+    void Update(void); // call every frame
 
     void ToggleMute(void);
     bool IsMuted(void);
