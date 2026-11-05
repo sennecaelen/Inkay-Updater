@@ -6,17 +6,16 @@ namespace Inkay {
     namespace GUI {
         // 0xRRGGBBAA
         enum Colors : u32 {
-            Background = 0x15161CFF,
-            Bar        = 0x23252EFF,
-            Row        = 0x2C2F3AFF,
-            RowActive  = 0x3D4252FF,
-            Fg         = 0xF2F2F2FF,
-            Dim        = 0xA0A4B0FF,
-            Pretendo   = 0x8C50DCFF,
-            Protarium  = 0xDE3E3EFF,
-            NoNetwork  = 0x5A5D66FF,
-            Good       = 0x4CC38AFF,
-            Warn       = 0xF0B43CFF
+            Shade      = 0x0000005CU, // header, footer
+            Card       = 0x00000052U,
+            CardActive = 0xFFFFFF30U,
+            Fg         = 0xF5F5F5FFU,
+            Dim        = 0xCDBEE1FFU, // light lilac, from the icon gradient
+            Pretendo   = 0x9B62F0FFU,
+            Protarium  = 0xF0525CFFU,
+            NoNetwork  = 0x8A8494FFU,
+            Good       = 0x5FD69BFFU,
+            Warn       = 0xFFC452FFU
         };
 
         void Init(void);

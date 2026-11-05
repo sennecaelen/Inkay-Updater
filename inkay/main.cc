@@ -4,6 +4,7 @@
 #include "eg2/ax/stub.hh"
 #include "inkay/render/gui.hh"
 #include "inkay/updater/app.hh"
+#include "inkay/audio/music.hh"
 
 int main(void) {
     Render::Init();
@@ -18,8 +19,12 @@ int main(void) {
     Inkay::GUI::Init();
     Updater::App::Start();
 
+    // Background music; loops back to 17.92 s (sample 573440 at 32 kHz)
+    Music::Start("fs:/vol/content/music/background.mp3", 573440, 0.5f);
+
     while (Render::IsRunning()) {
         Updater::App::Update();
+        Music::Update();
         Inkay::GUI::Update();
 
         Render::BeginFrame();
@@ -29,6 +34,7 @@ int main(void) {
     }
 
     Inkay::GUI::Shutdown();
+    Music::Shutdown();
     AX::Shutdown();
     Network::Shutdown();
     Render::Shutdown();

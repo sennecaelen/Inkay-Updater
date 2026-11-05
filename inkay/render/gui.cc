@@ -1,10 +1,12 @@
 #include "eg2/libs/typedefs.h"
 #include "eg2/tex/font.hh"
 #include "eg2/tex/color.hh"
+#include "eg2/tex/textures.hh"
 #include "eg2/render/screen.hh"
 #include "eg2/controller/drc.hh"
 #include "inkay/render/gui.hh"
 #include "inkay/updater/app.hh"
+#include "inkay/audio/music.hh"
 #include "inkay/version.hh"
 #include <memory>
 #include <string>
@@ -18,6 +20,8 @@ namespace Inkay {
 
         static std::unique_ptr<Tex::LatteFont> Font;
         static std::unique_ptr<Tex::LatteColor> Fill;
+        static std::unique_ptr<Tex::LatteTex> Background;
+        static std::unique_ptr<Tex::LatteTex> Logo;
         static bool DidCenterFont = false;
 
         static constexpr int VISIBLE_ROWS = 5;
@@ -26,7 +30,10 @@ namespace Inkay {
 
         void Init(void) {
             Font = std::make_unique<Tex::LatteFont>(FONT_CAFESTD, 24.0f);
-            Fill = std::make_unique<Tex::LatteColor>((u32)Colors::Background);
+            Fill = std::make_unique<Tex::LatteColor>((u32)Colors::Card);
+            // Same purple to red gradient as the app icon
+            Background = std::make_unique<Tex::LatteTex>("fs:/vol/content/ui/background.png");
+            Logo = std::make_unique<Tex::LatteTex>("fs:/vol/content/ui/logo.png");
         }
 
         static void DrawBox(u32 color, f32 w, f32 h, f32 x, f32 y) {
@@ -86,8 +93,9 @@ namespace Inkay {
                 const f32 y = ROW_Y0 + (i - first) * ROW_STEP;
                 const Status status = App::GetStatus(env);
 
-                DrawBox(active ? Colors::RowActive : Colors::Row, 780.0f, 58.0f, 0.0f, y);
-                DrawBox(NetColor(env.installed), 8.0f, 58.0f, -386.0f, y);
+                DrawBox(active ? Colors::CardActive : Colors::Card, 780.0f, 58.0f, 0.0f, y);
+                DrawBox(NetColor(env.installed), 6.0f, 58.0f, -387.0f, y);
+                if (active) DrawBox(NetColor(env.target), 6.0f, 58.0f, 387.0f, y);
 
                 DrawText(env.name, Colors::Fg, 0.0f, y - 12.0f, 24.0f);
 
@@ -115,11 +123,13 @@ namespace Inkay {
         }
 
         void Render(void) {
-            DrawBox(Colors::Background, 854.0f, 480.0f, 0.0f, 0.0f);
-            DrawBox(Colors::Bar, 854.0f, 55.0f, 0.0f, -214.0f);
-            DrawBox(Colors::Bar, 854.0f, 55.0f, 0.0f, 214.0f);
+            if (Background) Background->RenderTexCenteredScaled(RENDERRATIO_ASPECT_854x480, 854.0f, 480.0f, 0.0f, 0.0f);
+            DrawBox(Colors::Shade, 854.0f, 55.0f, 0.0f, -214.0f);
+            DrawBox(Colors::Shade, 854.0f, 55.0f, 0.0f, 214.0f);
 
-            DrawText("Inkay Updater " UPDATER_VERSION, Colors::Fg, 0.0f, -214.0f, 30.0f);
+            if (Logo) Logo->RenderTexCenteredScaled(RENDERRATIO_ASPECT_854x480, 38.0f, 38.0f, -112.0f, -214.0f);
+            DrawText("Inkay Updater", Colors::Fg, 12.0f, -216.0f, 30.0f, 240.0f);
+            DrawText(UPDATER_VERSION, Colors::Dim, 370.0f, -214.0f, 16.0f, 120.0f);
 
             switch (App::GetScreen()) {
                 case App::Screen::Checking:
@@ -128,7 +138,7 @@ namespace Inkay {
 
                 case App::Screen::List:
                     RenderList();
-                    DrawText("Up/Down: environment    Left/Right: network    +: check again    HOME: exit", Colors::Dim, 0.0f, 214.0f, 18.0f);
+                    DrawText(std::string("Up/Down: environment    Left/Right: network    +: check again    Y: music ") + (Music::IsMuted() ? "on" : "off"), Colors::Dim, 0.0f, 214.0f, 18.0f);
                     break;
 
                 case App::Screen::Downloading:
@@ -160,6 +170,8 @@ namespace Inkay {
                 DidCenterFont = true;
             }
 
+            if (DRC::ButtonTriggered(DRC::Input::Y)) Music::ToggleMute();
+
             switch (App::GetScreen()) {
                 case App::Screen::List:
                     if (DRC::ButtonTriggered(DRC::Input::Down) || DRC::ButtonTriggered(DRC::Input::LS_Down)) App::MoveSelection(1);
@@ -187,6 +199,8 @@ namespace Inkay {
         void Shutdown(void) {
             Font.reset();
             Fill.reset();
+            Background.reset();
+            Logo.reset();
         }
     }
 }

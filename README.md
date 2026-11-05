@@ -18,6 +18,7 @@ It downloads the latest release straight from the official repositories:
   - The download is checked first: it has to contain exactly one valid plugin (`.wps`) and module (`.wms`).
   - The new files are written next to the old ones and read back.
   - Only then are they swapped in. If anything fails, the old Inkay is put back, so a bad download or a full SD card never leaves you with a broken Inkay.
+- **Background music**: an original track by Senne Caelen that loops seamlessly. Press **Y** to turn it on or off.
 - **No double Inkay**: another Inkay file under a different name in the same environment (which would load twice) is switched off by renaming it to `.disabled`.
 
 ## Install
@@ -36,6 +37,7 @@ Requires a Wii U with [Aroma](https://aroma.foryour.cafe/).
 | Left / Right | Choose the network to install (Pretendo / Protarium) |
 | A | Install or update |
 | + | Check for updates again |
+| Y | Music on/off |
 | B (after installing) | Restart the console |
 | HOME | Exit |
 
@@ -63,4 +65,6 @@ The app ends up in `build/inkay_updater.wuhb`. GitHub Actions builds every push,
 
 - Based on [Roséverse Installer](https://github.com/Project-Rose/Roseverse-Installer) by Project Rosé & contributors (MIT). Its eg2 framework (rendering, input, network) is used unchanged apart from a small download fix.
 - [Pretendo Network](https://pretendo.network/) and [Protarium Network](https://github.com/Protarium-Network) for Inkay.
+- [minimp3](https://github.com/lieff/minimp3) (CC0) for playing the music.
+- Music: original composition by Senne Caelen.
 - Third-party licenses are in `licenses/`.
