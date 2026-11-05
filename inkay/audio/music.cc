@@ -4,6 +4,8 @@
 #include <sndcore2/device.h>
 #include <sndcore2/voice.h>
 #include <coreinit/cache.h>
+#include <coreinit/thread.h>
+#include <coreinit/time.h>
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
@@ -35,11 +37,18 @@ namespace Music {
     static bool gMuted = false;
     static AXVoice* gVoices[2] = {nullptr, nullptr};
 
+    // Called after every MP3 frame. Gives the CPU back regularly so the
+    // screen keeps running while the song is decoded.
     static int Progress(void*, size_t, uint64_t, mp3dec_frame_info_t*) {
+        static uint32_t frames = 0;
+        if (++frames % 8 == 0) OSSleepTicks(OSMicrosecondsToTicks(500));
         return gAbort.load() ? 1 : 0; // non-zero stops decoding
     }
 
     static void Decode(std::string path) {
+        // Lower priority than the main thread (higher number = lower priority)
+        OSSetThreadPriority(OSGetCurrentThread(), 28);
+
         std::vector<uint8_t> file;
         FILE* f = fopen(path.c_str(), "rb");
         if (f) {

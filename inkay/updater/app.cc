@@ -3,6 +3,7 @@
 #include "eg2/network/curl.hh"
 #include "eg2/sys/report.hh"
 #include <atomic>
+#include <coreinit/thread.h>
 #include <cstdint>
 #include <thread>
 
@@ -46,6 +47,7 @@ namespace Updater {
             gCheckDone = false;
 
             std::thread([]() {
+                OSSetThreadPriority(OSGetCurrentThread(), 20); // below the screen
                 Releases::FetchAll();
                 gScanned = Environments::Scan(ENVIRONMENTS_ROOT);
                 gCheckDone = true;
