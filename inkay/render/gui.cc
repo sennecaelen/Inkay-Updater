@@ -32,8 +32,7 @@ namespace Inkay {
             Font = std::make_unique<Tex::LatteFont>(FONT_CAFESTD, 24.0f);
             Fill = std::make_unique<Tex::LatteColor>((u32)Colors::Card);
             // Same purple to red gradient as the app icon
-            Background = std::make_unique<Tex::LatteTex>("fs:/vol/content/ui/background.png");
-            Logo = std::make_unique<Tex::LatteTex>("fs:/vol/content/ui/logo.png");
+            // test build: no images
         }
 
         static void DrawBox(u32 color, f32 w, f32 h, f32 x, f32 y) {
