@@ -1,0 +1,64 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitppc:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITPPC: /opt/devkitpro/devkitPPC
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          make clean
+          make -j$(nproc)
+          test -f build/inkay_updater.wuhb
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: inkay_updater.wuhb
+          path: build/inkay_updater.wuhb
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    # Pushing to the release branch publishes the version in inkay/version.hh
+    if: github.ref == 'refs/heads/release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: inkay_updater.wuhb
+          path: release
+
+      - name: Version
+        id: version
+        run: echo "tag=$(sed -n 's/^#define UPDATER_VERSION "\(.*\)"/\1/p' inkay/version.hh)" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Inkay Updater ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          body_path: .github/release-notes.md
+          files: release/inkay_updater.wuhb

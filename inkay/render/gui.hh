@@ -4,16 +4,20 @@
 
 namespace Inkay {
     namespace GUI {
+        // 0xRRGGBBAA
         enum Colors : u32 {
-            Default = 0x00C900FF,
-            Juxt = 0x8C50DCFF,
-            NoInkay = 0x282828FF,
-            Browser = 0x1A0DABFF,
-            Black = 0x000000FF,
-            Holder = 0xD5D5D5FF
+            Background = 0x15161CFF,
+            Bar        = 0x23252EFF,
+            Row        = 0x2C2F3AFF,
+            RowActive  = 0x3D4252FF,
+            Fg         = 0xF2F2F2FF,
+            Dim        = 0xA0A4B0FF,
+            Pretendo   = 0x8C50DCFF,
+            Protarium  = 0xDE3E3EFF,
+            NoNetwork  = 0x5A5D66FF,
+            Good       = 0x4CC38AFF,
+            Warn       = 0xF0B43CFF
         };
-
-        extern const u32 BgColor;
 
         void Init(void);
         void Render(void);

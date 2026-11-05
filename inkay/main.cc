@@ -3,16 +3,23 @@
 #include "eg2/render/frames.hh"
 #include "eg2/ax/stub.hh"
 #include "inkay/render/gui.hh"
-#include "inkay/repos/core.hh"
+#include "inkay/updater/app.hh"
 
 int main(void) {
     Render::Init();
     Network::Init();
     AX::Init();
+
+    Network::GiveCertCA("fs:/vol/content/shoumeisho/CA.pem");
+    Network::SetUserAgent("Inkay-Updater/1.0 (Wii U; +https://github.com/sennecaelen/Inkay-Updater)");
+    Network::SetHeader("Accept: application/vnd.github+json");
+    Network::SetHeader("X-GitHub-Api-Version: 2022-11-28");
+
     Inkay::GUI::Init();
-    Inkay::Repos::Init();
+    Updater::App::Start();
 
     while (Render::IsRunning()) {
+        Updater::App::Update();
         Inkay::GUI::Update();
 
         Render::BeginFrame();
@@ -21,7 +28,6 @@ int main(void) {
         Render::EndFrame();
     }
 
-    Inkay::Repos::Shutdown();
     Inkay::GUI::Shutdown();
     AX::Shutdown();
     Network::Shutdown();

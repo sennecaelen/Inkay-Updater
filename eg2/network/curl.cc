@@ -200,6 +200,7 @@ namespace Network {
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFileCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outData);
+        curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L); // a 404 page is not a download
         curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, initSocket);
 
         CURLcode res = curl_easy_perform(curl);

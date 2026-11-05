@@ -34,7 +34,7 @@ endif
 #----------------------------------------
 include $(WUT_ROOT)/share/wut_rules
 
-TARGETNAME  = roseverse_installer
+TARGETNAME  = inkay_updater
 TARGET      = inkay
 
 BUILDDIR 	= build
@@ -91,9 +91,9 @@ WUHBTVSPLASH    = $(METADIR)/tv-splash.png
 WUHBDRCSPLASH   = $(METADIR)/drc-splash.png
 
 WUHBFLAGS = \
-	--name="Roseversé Installer" \
-	--short-name="Roseversé Installer" \
-	--author="Project Rosé" \
+	--name="Inkay Updater" \
+	--short-name="Inkay Updater" \
+	--author="Senne Caelen (based on Roseverse Installer by Project Rose)" \
 	--icon="$(WUHBMENICO)" \
 	--tv-image="$(WUHBTVSPLASH)" \
 	--drc-image="$(WUHBDRCSPLASH)" \
@@ -146,6 +146,7 @@ $(TARGETDIR)/$(TARGETNAME).elf: $(OBJFILES)
 #----------------------------------------
 $(CODEDIR)/$(TARGETNAME).rpx: $(TARGETDIR)/$(TARGETNAME).elf
 	$(Q)$(ECHO) "Building $(TARGETNAME).rpx"
+	$(Q)$(MKDIR) $(CODEDIR)
 	$(Q)$(ELF2RPL) $< $@
 
 #----------------------------------------
