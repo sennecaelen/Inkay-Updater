@@ -26,7 +26,7 @@ int main(void) {
         if (frame < 10 && ++frame == 3) {
             Updater::App::Start();
             // Background music; loops back to 17.92 s (sample 573440 at 32 kHz)
-            Music::Start("fs:/vol/content/music/background.mp3", 573440, 0.5f);
+            // test build: no music
         }
 
         Updater::App::Update();
