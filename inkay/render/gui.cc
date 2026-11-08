@@ -43,10 +43,18 @@ namespace Inkay {
         }
 
         // Centered text, sized by its height (the width is only a maximum)
+        // Measured on the console: the system font fills the given height
+        // about 1.5x more than the layout assumed, and its letters sit a
+        // quarter of their height low. Corrected here so the layout values
+        // (h = size the text should look) match the design.
+        static constexpr f32 FONT_SCALE = 0.65f;
+        static constexpr f32 FONT_RAISE = 0.25f;
+
         static void DrawText(const std::string& text, u32 color, f32 x, f32 y, f32 h, f32 maxW = 780.0f) {
             if (!Font || text.empty()) return;
+            const f32 size = h * FONT_SCALE;
             Font->SetColor(color);
-            Font->RenderTextCenteredScaled(x, y, RENDERRATIO_ASPECT_854x480, maxW, h, text.c_str());
+            Font->RenderTextCenteredScaled(x, y - size * FONT_RAISE, RENDERRATIO_ASPECT_854x480, maxW, size, text.c_str());
         }
 
         static u32 NetColor(Net net) {
@@ -127,7 +135,7 @@ namespace Inkay {
             DrawBox(Colors::Shade, 854.0f, 55.0f, 0.0f, -214.0f);
             DrawBox(Colors::Shade, 854.0f, 55.0f, 0.0f, 214.0f);
 
-            if (Logo) Logo->RenderTexCenteredScaled(RENDERRATIO_ASPECT_854x480, 38.0f, 38.0f, -112.0f, -214.0f);
+            if (Logo) Logo->RenderTexCenteredScaled(RENDERRATIO_ASPECT_854x480, 38.0f, 38.0f, -120.0f, -214.0f);
             DrawText("Inkay Updater", Colors::Fg, 12.0f, -216.0f, 30.0f, 240.0f);
             DrawText(UPDATER_VERSION, Colors::Dim, 370.0f, -214.0f, 16.0f, 120.0f);
 
