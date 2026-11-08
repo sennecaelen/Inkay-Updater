@@ -1,3 +1,5 @@
+**What's new in v1.0.1:** the UI now matches the design: text is no longer too big on the console, and everything fits in its card again.
+
 Keeps Inkay up to date for **Pretendo** and **Protarium**, in every Aroma environment on your SD card.
 
 - One list with all environments, showing the installed network and version and whether an update is available
